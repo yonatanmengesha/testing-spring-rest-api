@@ -2,6 +2,7 @@ package com.luv2code.springmvc;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.luv2code.springmvc.models.CollegeStudent;
+import com.luv2code.springmvc.models.MathGrade;
 import com.luv2code.springmvc.repository.HistoryGradesDao;
 import com.luv2code.springmvc.repository.MathGradesDao;
 import com.luv2code.springmvc.repository.ScienceGradesDao;
@@ -23,8 +24,11 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
+
 import static org.hamcrest.Matchers.hasSize;
 //import static org.springframework.mock.http.server.reactive.MockServerHttpRequest.post;
+import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -169,6 +173,125 @@ public class GradeBookControllerTest {
       //  System.out.println(studentDao.findById(1));
        // System.out.println(studentDao.findById(0));
     }
+
+    @DisplayName("Test Delete Invalid student id ")
+    @Test
+    public void testDeleteStudentHttpRequestErrorPage() throws Exception{
+
+        assertFalse(studentDao.findById(0).isPresent());
+        mockMvc.perform(MockMvcRequestBuilders.delete("/student/{id}",0))
+                .andExpect(status().is4xxClientError())
+                .andExpect(jsonPath("$.status",is(404)))
+                .andExpect(jsonPath("$.message",is("Student or Grade was not found")));
+    }
+
+    @DisplayName("Test Student Information")
+    @Test
+    public void testStudentInformationHttpRequest() throws Exception{
+
+        Optional<CollegeStudent> student = studentDao.findById(1);
+
+        assertTrue(student.isPresent());
+        mockMvc.perform(MockMvcRequestBuilders.get("/studentInformation/{id}",1))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id",is(1)))
+                .andExpect(jsonPath("$.firstname",is("Eric")))
+                .andExpect(jsonPath("$.lastname",is("Roby")))
+                .andExpect(jsonPath("$.emailAddress",is("eric.roby@luv2code_school.com")));
+    }
+
+    @DisplayName("Student Information Not Found")
+    @Test
+    public void testStudentInformationHttpRequestErrorPage() throws Exception{
+        assertFalse(studentDao.findById(0).isPresent());
+        mockMvc.perform(MockMvcRequestBuilders.get("/studentInformation/{id}",0))
+                .andExpect(status().is4xxClientError())
+                .andExpect(jsonPath("$.status",is(404)))
+                .andExpect(jsonPath("$.message",is("Student or Grade was not found")));
+    }
+
+    @DisplayName("Create a Valid Grade")
+    @Test
+    public void testCreateValidGradeHttpRequest() throws Exception{
+        mockMvc.perform(post("/grades")
+                .contentType(APPLICATION_JSON)
+                .param("grade","85.00")
+                .param("gradeType","math")
+                .param("studentId","1"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(APPLICATION_JSON_UTF8))
+                .andExpect(jsonPath("$.id",is(1)))
+                .andExpect(jsonPath("$.firstname",is("Eric")))
+                .andExpect(jsonPath("$.lastname",is("Roby")))
+                .andExpect(jsonPath("$.emailAddress",is("eric.roby@luv2code_school.com")))
+                .andExpect(jsonPath("$.studentGrades.mathGradeResults",hasSize(2)));
+    }
+
+    @DisplayName("Create Grades for invalid student id")
+    @Test
+    public void testCreateValidGradeHttpRequestStudentDoesNotExistEmptyResponse() throws  Exception{
+
+        mockMvc.perform(post("/grades")
+                .contentType(APPLICATION_JSON)
+                .param("grade","85.00")
+                .param("gradeType","math")
+                .param("studentId","0"))
+                .andExpect(status().is4xxClientError())
+                .andExpect(jsonPath("$.status",is(404)))
+                .andExpect(jsonPath("$.message",is("Student or Grade was not found")));
+    }
+
+    @DisplayName("Test For Invalid Grade Type")
+    @Test
+    public void testCreateInValidGradeHttpRequestGradeTypeDoesNotExistEmptyResponse() throws Exception{
+
+        mockMvc.perform(post("/grades")
+                .contentType(APPLICATION_JSON)
+                .param("grade","85.00")
+                .param("gradeType","literature")
+                .param("studentId","1"))
+                .andExpect(status().is4xxClientError())
+                .andExpect(jsonPath("$.status",is(404)))
+                .andExpect(jsonPath("$.message",is("Student or Grade was not found")));
+    }
+
+    @DisplayName("Delete A Valid Grade")
+    @Test
+    public void testDeleteAValidGradeHttpRequest() throws Exception{
+
+        assertTrue(studentDao.findById(1).isPresent());
+        mockMvc.perform(MockMvcRequestBuilders.delete("/grades/{id}/{gradeType}",1,"math"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(APPLICATION_JSON_UTF8))
+                .andExpect(jsonPath("$.id",is(1)))
+                .andExpect(jsonPath("$.firstname",is("Eric")))
+                .andExpect(jsonPath("$.lastname",is("Roby")))
+                .andExpect(jsonPath("$.emailAddress",is("eric.roby@luv2code_school.com")))
+                .andExpect(jsonPath("$.studentGrades.mathGradeResults",hasSize(0)));
+
+    }
+   @DisplayName("Delete Invalid Student Id")
+   @Test
+   public void testDeleteValidGradeHttpRequestStudentIdDoesNotExistEmptyResponse() throws Exception{
+
+        Optional<MathGrade> mathGrade = mathGradeDao.findById(0);
+        assertFalse(mathGrade.isPresent());
+        mockMvc.perform(MockMvcRequestBuilders.delete("/grades/{id}/{gradeType}",2,"history"))
+                .andExpect(status().is4xxClientError())
+                .andExpect(jsonPath("$.status",is(404)))
+                .andExpect(jsonPath("$.message", is("Student or Grade was not found")));
+
+   }
+
+   @DisplayName("Invalid GradeType")
+   @Test
+   public void testDeleteInvalidGradeHttpRequestForInvalidGradeType() throws Exception{
+
+        mockMvc.perform(MockMvcRequestBuilders.delete("/grades/{id}/{gradeType}",1,"literature"))
+                .andExpect(status().is4xxClientError())
+                .andExpect(jsonPath("$.status",is(404)))
+                .andExpect(jsonPath("$.message",is("Student or Grade was not found")));
+   }
 
     @AfterEach
     public void setupAfterTransaction() {
